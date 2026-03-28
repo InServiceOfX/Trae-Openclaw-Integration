@@ -1,12 +1,12 @@
 # TRAE OpenClaw Integration
 
-Bridge between [OpenClaw](https://github.com/openclaw/openclaw) and [TRAE IDE](https://www.trae.ai/) — enables OpenClaw to orchestrate TRAE as an AI coding agent.
+Bridge between [OpenClaw](https://github.com/openclaw/openclaw) and [TRAE IDE](https://www.trae.ai/) — enables any OpenClaw agent to orchestrate TRAE as an AI coding agent.
 
-**What it does:** KIPP (OpenClaw) connects to a TRAE extension that exposes an MCP server, allowing KIPP to delegate coding tasks to TRAE's SOLO agent while maintaining orchestration control.
+**What it does:** OpenClaw connects to a TRAE extension that exposes an MCP server, allowing the agent to delegate coding tasks to TRAE's SOLO agent while maintaining orchestration control.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  KIPP (OpenClaw)                                                │
+│  OpenClaw Agent                                                │
 │  ┌─────────────┐    ┌──────────────────┐    ┌───────────────┐  │
 │  │ MCP Client  │───▶│ Unix Socket      │───▶│ TRAE Extension│  │
 │  │ (OpenClaw)  │    │ /tmp/trae-mcp.sock│    │ (MCP Server)  │  │
@@ -42,7 +42,7 @@ A VS Code/TRAE extension that exposes these tools over a Unix socket:
 
 ### `openclaw-skill/` — OpenClaw MCP Client Skill
 
-The OpenClaw skill that connects to the TRAE MCP server and exposes its tools to KIPP.
+The OpenClaw skill that connects to the TRAE MCP server and exposes its tools to any OpenClaw agent.
 
 ## Setup
 
@@ -69,13 +69,13 @@ In TRAE:
 
 The MCP server will start on `/tmp/trae-openclaw-mcp.sock`.
 
-### 3. Use from OpenClaw (KIPP)
+### 3. Use from OpenClaw
 
-Once the extension is running, KIPP can directly call the MCP tools:
+Once the extension is running, OpenClaw can directly call the MCP tools:
 
 ```
-KIPP, read the file src/app.ts in the workspace and explain what it does.
-KIPP, delegate this bug fix to TRAE: the login button doesn't work on mobile.
+OpenClaw, read the file src/app.ts in the workspace and explain what it does.
+OpenClaw, delegate this bug fix to TRAE: the login button doesn't work on mobile.
 ```
 
 ## Development

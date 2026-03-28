@@ -1,13 +1,13 @@
 # SKILL.md — TRAE OpenClaw MCP Integration
 
-**Purpose:** Connect KIPP to TRAE IDE over a Unix socket using the MCP protocol, enabling file operations, code search, terminal commands, and delegating tasks to TRAE's AI agent (SOLO).
+**Purpose:** Connect an OpenClaw agent to TRAE IDE over a Unix socket using the MCP protocol, enabling file operations, code search, terminal commands, and delegating tasks to TRAE's AI agent (SOLO).
 
 ---
 
 ## Architecture
 
 ```
-KIPP (OpenClaw)  →  mcp_client.py  →  /tmp/trae-openclaw-mcp.sock  →  TRAE Extension  →  VS Code API
+OpenClaw Agent  →  mcp_client.py  →  /tmp/trae-openclaw-mcp.sock  →  TRAE Extension  →  VS Code API
                                                                                         ↓
                                                                                   TRAE SOLO Agent
 ```
@@ -275,7 +275,7 @@ result = call_tool(sock, "invoke_solo_agent", {
 
 ## Workflow: Delegating a Coding Task to TRAE
 
-Here's the complete workflow KIPP should follow when Ernest says *"Have TRAE fix the login bug in auth.ts"*:
+Here's the complete workflow the agent should follow when the user says *"Have TRAE fix the login bug in auth.ts"*:
 
 ```python
 from mcp_client import connect, call_tool
@@ -311,9 +311,9 @@ result = call_tool(sock, "invoke_solo_agent", {
 if result.get("success"):
     print("SOLO agent is working on it!")
 else:
-    # Fallback: KIPP handles it directly
+    # Fallback: the agent handles it directly
     print("SOLO unavailable, fixing manually...")
-    fixed_content = code["content"].replace("/* TODO: fix */" , "// fixed by KIPP")
+    fixed_content = code["content"].replace("/* TODO: fix */" , "// fixed by the agent")
     call_tool(sock, "write_file", {"path": "src/auth.ts", "content": fixed_content})
 
 sock.close()
@@ -373,7 +373,7 @@ This test script:
 2. Lists tools
 3. Gets workspace info
 4. Lists workspace root
-5. Creates `kipp-test-output.txt`
+5. Creates `openclaw-test-output.txt`
 6. Searches for content in that file
 7. Reads the file back
 8. Runs a shell command

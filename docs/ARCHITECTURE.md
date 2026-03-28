@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  KIPP (OpenClaw)                                                │
+│  OpenClaw Agent                                                │
 │                                                                 │
 │  ┌──────────────────┐      ┌─────────────────────┐             │
 │  │ MCP Client Skill │─────▶│ Unix Socket          │             │
@@ -62,7 +62,7 @@ Sits inside the TRAE IDE. Exposes a JSON-RPC interface over a Unix socket.
 
 ### `openclaw-skill/` — OpenClaw MCP Client Skill
 
-KIPP's skill that connects to the extension's Unix socket and calls tools.
+OpenClaw's skill that connects to the extension's Unix socket and calls tools.
 
 ## MCP Protocol
 

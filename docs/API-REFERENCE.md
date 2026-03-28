@@ -178,7 +178,7 @@ Writes content to a file, creating it and parent directories if needed.
 ```python
 result = call_tool(sock, "write_file", {
     "path": "src/utils/logger.ts",
-    "content": "export const log = (...args: unknown[]) => console.log('[KIPP]', ...args);\n"
+    "content": "export const log = (...args: unknown[]) => console.log('[agent]', ...args);\n"
 })
 ```
 
