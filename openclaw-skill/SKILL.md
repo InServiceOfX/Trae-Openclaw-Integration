@@ -123,6 +123,8 @@ for attempt in range(5):
 | `docker_list_images` | List Docker images | — |
 | `docker_get_logs` | Get container logs | `container`, `tail` |
 | `solo_build` | Trigger SOLO Builder with a task | `task` |
+| `create_agent` | Create a custom agent in TRAE | `name`, `prompt`, `englishIdentifier`, `mcpServers`, `builtInTools` |
+| `list_agents` | List all custom agents in TRAE | — |
 
 ---
 
