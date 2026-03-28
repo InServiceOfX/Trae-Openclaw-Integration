@@ -528,6 +528,222 @@ const TOOLS = {
             return { success: false, error: String(e) };
         }
     },
+    // Open the Vercel/remote deploy panel in TRAE SOLO Builder
+    // Uses icube.common.commands.tooling.deployToRemote discovered in workbench JS
+    open_deploy_panel: async (params) => {
+        const deployCommands = [
+            'icube.common.commands.tooling.deployToRemote',
+            'trae.solo.guide.showSoloBuild',
+            'icube.ai.focus-to-integration-view',
+        ];
+        const results = [];
+        for (const cmd of deployCommands) {
+            try {
+                const r = await vscode.commands.executeCommand(cmd, params.args);
+                results.push({ command: cmd, success: true, result: r });
+                // Return on first success
+                return {
+                    success: true,
+                    command: cmd,
+                    result: r,
+                    note: 'Deploy panel opened. Check TRAE SOLO Builder for deployment options.',
+                    vercel_commands: [
+                        'deploy_click',
+                        'deploy_connect_vercel_click',
+                        'deploy_auth_click',
+                        'deploy_open_preview',
+                    ],
+                    hint: 'To deploy to Vercel from SOLO Builder: open the deploy panel in TRAE, connect your Vercel account, then trigger deployment.',
+                };
+            }
+            catch (e) {
+                results.push({ command: cmd, success: false, error: String(e) });
+            }
+        }
+        return {
+            success: false,
+            tried: results,
+            note: 'None of the deploy panel commands succeeded. SOLO Builder deploy panel may require active SOLO mode.',
+            hint: 'Ensure TRAE is in SOLO mode (trae.solo.mode.toggle) and a project is open before trying deployment.',
+        };
+    },
+    // Open the built-in browser tool in TRAE SOLO
+    // Uses icube.common.commands.tooling.browserUseTool and icube.preview.show
+    open_browser_tool: async (params) => {
+        const url = params.url;
+        const action = params.action || 'navigate'; // navigate | screenshot | listTabs
+        if (action === 'listTabs') {
+            try {
+                const r = await vscode.commands.executeCommand('icube.common.commands.tooling.browserListTabs');
+                return { success: true, action: 'listTabs', tabs: r };
+            }
+            catch (e) {
+                return { success: false, action: 'listTabs', error: String(e) };
+            }
+        }
+        if (action === 'openPreview' || action === 'preview') {
+            try {
+                const r = await vscode.commands.executeCommand('icube.common.commands.tooling.openPreview', url ? { url } : undefined);
+                return { success: true, action: 'openPreview', url, result: r };
+            }
+            catch (e) {
+                // Fallback: try icube.preview.show
+                try {
+                    const r2 = await vscode.commands.executeCommand('icube.preview.show', url);
+                    return { success: true, action: 'openPreview', url, result: r2, method: 'icube.preview.show' };
+                }
+                catch (e2) {
+                    return { success: false, action: 'openPreview', url, error: String(e), fallback_error: String(e2) };
+                }
+            }
+        }
+        // Default: use browserUseTool (TRAE's built-in AI browser automation)
+        const browserAction = params.browserAction;
+        const toolParams = {};
+        if (url)
+            toolParams.url = url;
+        if (browserAction)
+            toolParams.action = browserAction;
+        try {
+            const r = await vscode.commands.executeCommand('icube.common.commands.tooling.browserUseTool', { action: browserAction || 'navigate', url, ...params });
+            return {
+                success: true,
+                action: 'browserUseTool',
+                url,
+                result: r,
+                available_browser_actions: ['navigate', 'screenshot', 'click', 'type', 'scroll', 'back', 'forward', 'refresh'],
+            };
+        }
+        catch (e) {
+            // Try switching to BROWSER_TYPE_TAG view
+            try {
+                await vscode.commands.executeCommand('trae.solo.mode.toggle');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                // Try to open browser view
+                const r2 = await vscode.commands.executeCommand('icube.ai.focus-to-integration-view');
+                return {
+                    success: true,
+                    action: 'openBrowserView',
+                    result: r2,
+                    note: 'Switched to SOLO mode and opened browser view.',
+                    hint: 'Use action="listTabs" to see open browser tabs, or action="openPreview" with a url to open a preview.',
+                };
+            }
+            catch (e2) {
+                return {
+                    success: false,
+                    action,
+                    url,
+                    error: String(e),
+                    fallback_error: String(e2),
+                    hint: 'Browser tool requires TRAE SOLO mode with browser view active. Try start_solo_mode first.',
+                    available_commands: [
+                        'icube.common.commands.tooling.browserUseTool',
+                        'icube.common.commands.tooling.browserListTabs',
+                        'icube.common.commands.tooling.openPreview',
+                        'icube.preview.show',
+                    ],
+                };
+            }
+        }
+    },
+    // Get the current state of the SOLO trajectory/plan
+    // SOLO CODER uses Plan mode (/Plan) and Spec mode (/Spec) to create tasks
+    get_trajectory_state: async (params) => {
+        const results = {};
+        // Try to get streaming task state
+        try {
+            const hasTask = await vscode.commands.executeCommand('icube.common.commands.tooling.hasStreamingTask');
+            results.hasStreamingTask = hasTask;
+        }
+        catch (e) {
+            results.hasStreamingTask = null;
+        }
+        // Try to get auto-run config
+        try {
+            const autoRun = await vscode.commands.executeCommand('icube.common.commands.tooling.getAutoRunConfig');
+            results.autoRunConfig = autoRun;
+        }
+        catch (e) {
+            results.autoRunConfig = null;
+        }
+        // Try to get active runtime environments (sandbox/dev containers)
+        try {
+            const runtimes = await vscode.commands.executeCommand('icube.common.commands.tooling.getActiveRuntimeEnvironmentList');
+            results.activeRuntimes = runtimes;
+        }
+        catch (e) {
+            results.activeRuntimes = null;
+        }
+        // Try to get file diff count (indicator of pending changes)
+        try {
+            const diffCount = await vscode.commands.executeCommand('icube.common.commands.tooling.fileDiffCount');
+            results.fileDiffCount = diffCount;
+        }
+        catch (e) {
+            results.fileDiffCount = null;
+        }
+        // Check for SOLO spec files in the workspace
+        const workspaceRoot = getFirstWorkspace();
+        const specPaths = [
+            path.join(workspaceRoot, '.trae', 'specs'),
+            path.join(workspaceRoot, '.trae', 'spec.md'),
+            path.join(workspaceRoot, '.trae', 'tasks.md'),
+            path.join(workspaceRoot, '.trae', 'checklist.md'),
+        ];
+        const specFiles = [];
+        for (const sp of specPaths) {
+            try {
+                const stat = await fs.promises.stat(sp);
+                if (stat.isFile()) {
+                    const content = await fs.promises.readFile(sp, 'utf-8');
+                    specFiles.push({ path: sp, exists: true, content: content.substring(0, 2000) });
+                }
+                else if (stat.isDirectory()) {
+                    const entries = await fs.promises.readdir(sp);
+                    specFiles.push({ path: sp, exists: true, content: `[directory: ${entries.join(', ')}]` });
+                }
+            }
+            catch {
+                // Not found
+            }
+        }
+        results.specFiles = specFiles;
+        // Try to get diagnostics (current errors/warnings)
+        try {
+            const diagnostics = await vscode.commands.executeCommand('icube.common.commands.tooling.getDiagnostics');
+            results.diagnostics = diagnostics;
+        }
+        catch (e) {
+            // Fallback: use VS Code API
+            const allDiags = vscode.languages.getDiagnostics();
+            const errors = allDiags.flatMap(([uri, diags]) => diags.filter(d => d.severity === vscode.DiagnosticSeverity.Error).map(d => ({
+                file: uri.fsPath,
+                message: d.message,
+                line: d.range.start.line + 1,
+            })));
+            results.diagnostics = { errors: errors.slice(0, 20), errorCount: errors.length };
+        }
+        // Check TRAE agent review state
+        try {
+            const agentReview = await vscode.commands.executeCommand('icube.agentReview.openSummary');
+            results.agentReviewSummary = agentReview;
+        }
+        catch {
+            results.agentReviewSummary = null;
+        }
+        return {
+            success: true,
+            trajectoryState: results,
+            note: 'Trajectory state captures SOLO task status, plan files, code changes, and diagnostics.',
+            interpretation: {
+                hasStreamingTask: 'true = SOLO is currently running a task',
+                fileDiffCount: 'Number of files changed by SOLO agent',
+                specFiles: 'Plan/Spec mode files created by SOLO Coder',
+                diagnostics: 'Current TypeScript/lint errors in the workspace',
+            },
+        };
+    },
     // Call any MCP server configured in TRAE (memory, github, docker, etc.)
     // OpenClaw uses this to route MCP tool calls through TRAE's MCP infrastructure
     call_mcp_server: async (params) => {

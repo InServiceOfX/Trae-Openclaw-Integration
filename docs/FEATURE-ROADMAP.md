@@ -1,7 +1,7 @@
 # TRAE OpenClaw Integration — Feature Roadmap
 
-Research date: 2026-03-28
-Source: docs.trae.ai
+Research date: 2026-03-28 (updated)
+Source: docs.trae.ai + workbench JS reverse-engineering
 
 ---
 
@@ -15,12 +15,115 @@ Source: docs.trae.ai
 | MCP management (list/add/open config) | ✅ Working | extension tools |
 | Memory MCP | ✅ Configured | In TRAE User mcp.json |
 | Terminal commands | ✅ Working | `run_command` / `run_terminal_command` |
+| Playwright MCP | ✅ Configured | In TRAE User mcp.json |
+| Deploy panel access | ✅ Added | `open_deploy_panel` tool |
+| Browser tool access | ✅ Added | `open_browser_tool` tool |
+| Trajectory/plan state | ✅ Added | `get_trajectory_state` tool |
+
+---
+
+---
+
+## New Research Findings (2026-03-28 Deep Dive)
+
+### TRAE Internal Tooling API (icube.common.commands.tooling.*)
+
+From reverse-engineering `workbench.desktop.main.js`, TRAE exposes a rich internal tooling API:
+
+```
+browserListTabs              ← List open browser tabs
+browserUseTool               ← Control the AI browser (navigate, screenshot, click, etc.)
+checkRunCommandStatus        ← Check if a terminal command is still running
+checkRuntimeEnvInitializeStatus ← Sandbox/container init status
+deployToRemote               ← TRIGGER VERCEL DEPLOYMENT ← high value
+fileDiffCount                ← Count files changed by SOLO agent
+getActiveRuntimeEnvironmentList ← List active sandboxes/containers
+getAllAgentExtensions         ← List all MCP agent extensions
+getAutoRunConfig             ← Auto-run settings
+getDefinitions               ← Go-to-definition (code nav)
+getDiagnostics               ← TypeScript/lint errors
+getFileDiff                  ← Get diff of specific file
+getNextAvailableTerminal     ← Get a free terminal
+getPreviewLog                ← Preview server logs
+getReferences                ← Find all references
+getRulesDetails              ← TRAE rules/context details
+getSandboxCliPath            ← Sandbox CLI tool path
+getStripeConfig              ← Stripe integration config
+getTextByRange               ← Read file by line range
+hasStreamingTask             ← Is SOLO currently running? ← trajectory state
+initializeRuntimeEnvironment ← Start a sandbox/container
+killTerminalRunningCommand   ← Kill a terminal process
+listFolder                   ← List directory
+openAIDocFile                ← Open AI documentation
+openPreview                  ← Open preview server ← browser tool
+printCurrentDiagnostics      ← Print diagnostics to output
+readContentInTerminal        ← Read terminal buffer
+readFile                     ← Read file
+refreshStripePrices          ← Stripe prices
+runAgentExtension            ← Run an MCP agent extension
+runCommandInTerminal         ← Run in terminal (async)
+runCommandInTerminalSync     ← Run in terminal (sync)
+searchGlobal                 ← Global search
+sendToCommand                ← Send text to a command
+statFile                     ← File metadata
+writeFile                    ← Write file
+writeSSEFile                 ← Write SSE stream file
+```
+
+### Newly Discovered icube.* Commands
+
+```
+icube.browser.humanTakeOver          ← Human takes control from AI browser
+icube.preview.show                   ← Show preview webview
+icube.preview.new_exception          ← Preview exception handling
+icube.worktree.*                     ← Git worktree management
+icube.session.updateWorktreeAfterMerge ← Worktree post-merge
+icube.userConfiguration.get          ← Get user config
+icube.webview.sendCommand            ← Send command to webview
+icube.ai.agentImport                 ← Import a custom agent ← high value
+icube.ai.developer.agentImportFromSchema ← Import agent from schema ← create agents!
+icube.cloudide.getAgentUrl           ← Get agent URL
+icube.common.commands.tooling.runAgentExtension ← Run MCP agent
+icube.common.commands.tooling.getAllAgentExtensions ← List all MCP agents
+```
+
+### Vercel Deployment Signals (telemetry events)
+
+```
+deploy_click                  ← Deploy button clicked
+deploy_connect_vercel_click   ← Connect Vercel
+deploy_auth_click             ← OAuth auth
+deploy_auth_popup_show        ← OAuth popup
+deploy_open_preview           ← Preview opened
+deploy_request                ← API request sent
+deploy_failed                 ← Failed
+deploy_check_log_click        ← View logs
+deploy_ai_resolve_click       ← AI resolved error
+```
 
 ---
 
 ## New Features from TRAE Docs
 
 ### Priority 1 — High Value, Achievable
+
+#### 0. NEW: Direct Tooling API Access (Priority 0 — Critical)
+
+We should expose the `icube.common.commands.tooling.*` API directly:
+
+```typescript
+// Add tool: invoke_trae_tooling
+// Allows calling any icube.common.commands.tooling.* command
+invoke_trae_tooling: async (params) => {
+  const tool = params.tool; // e.g., "hasStreamingTask"
+  const args = params.args;
+  return await vscode.commands.executeCommand(
+    `icube.common.commands.tooling.${tool}`, args
+  );
+}
+```
+
+This would give OpenClaw access to ALL of TRAE's internal AI tools.
 
 #### 1. Project-level MCP (`.trae/mcp.json`)
 - Create `.trae/mcp.json` in project root for auto-loading per-project
@@ -154,19 +257,22 @@ SOLO Coder
 
 ## Open Questions / Research Needed
 
-1. Does TRAE expose a command to trigger SOLO Builder deployment to Vercel?
-2. Can we create custom agents programmatically (storage format)?
-3. What's the SUPABASE integration CLI/API?
-4. Can DiffView results be read programmatically?
-5. Can we trigger Plan/Spec mode programmatically?
-6. Is there a `trae.solo.builder.deploy` command?
+1. ~~Does TRAE expose a command to trigger SOLO Builder deployment to Vercel?~~ **YES: `icube.common.commands.tooling.deployToRemote`**
+2. Can we create custom agents programmatically? **Partially YES: `icube.ai.agentImport` and `icube.ai.developer.agentImportFromSchema`**
+3. What's the SUPABASE integration CLI/API? → `icube.ai.connect-supabase-project`, `icube.ai.get-supabase-token`
+4. Can DiffView results be read programmatically? → `icube.common.commands.tooling.getFileDiff` + `fileDiffCount`
+5. Can we trigger Plan/Spec mode programmatically? → Needs more research (likely via `icube.ai-chat.sendMessage` with `/Plan` prefix)
+6. ~~Is there a `trae.solo.builder.deploy` command?~~ **It's `icube.common.commands.tooling.deployToRemote`**
 
 ---
 
 ## Most Impactful Next Steps
 
-1. **Add Playwright MCP** — web testing/automation is high value
-2. **HTTP MCP server** — extend `mcp_server.py` to serve over HTTP for remote access
-3. **Project MCP setup** — auto-create `.trae/mcp.json` for projects
-4. **Browser tool** — add screenshot capability via Playwright
-5. **Vercel deployment** — research if SOLO Builder deployment is triggerable via command
+1. **`invoke_trae_tooling` tool** — expose ALL `icube.common.commands.tooling.*` commands as one flexible tool
+2. **Agent import tool** — use `icube.ai.agentImport` / `icube.ai.developer.agentImportFromSchema` to create custom agents
+3. **`get_file_diff` tool** — use `icube.common.commands.tooling.getFileDiff` to review SOLO changes
+4. **`check_terminal_status` tool** — use `checkRunCommandStatus` to poll terminal commands
+5. **`read_terminal_buffer` tool** — use `readContentInTerminal` to get terminal output
+6. **HTTP MCP server** — extend `mcp_server.py` to serve over HTTP for remote access
+7. **Supabase integration** — expose `icube.ai.connect-supabase-project` and `get-supabase-token`
+8. ~~Playwright MCP~~ **Already configured in TRAE User mcp.json** ✅
