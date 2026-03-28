@@ -1,11 +1,41 @@
-# SKILL.md — TRAE OpenClaw MCP Integration (Copy to your workspace)
+# SKILL.md — TRAE OpenClaw Integration (Copy to your workspace)
 
-> **⚠️ NOTE:** This is an **example** skill file. Copy its contents to your actual OpenClaw
+> **NOTE:** This is an **example** skill file. Copy its contents to your actual OpenClaw
 > workspace at `~/.openclaw/workspace/<your-skill-name>/SKILL.md` and customize the paths.
 
-**Skill Name:** `trae-mcp`  
-**Purpose:** Connect OpenClaw to TRAE IDE via Unix socket MCP  
+**Skill Name:** `trae-mcp`
+**Purpose:** Connect OpenClaw to TRAE IDE via Unix socket MCP
 **Socket:** `/tmp/trae-openclaw-mcp.sock`
+
+---
+
+## How You Talk to Me (Voice Commands)
+
+Tell me what you want and I'll figure out which TRAE mode and tools to use:
+
+```
+# IDE Mode — I use file tools directly
+"In TRAE, in IDE mode, create a new Python file called hello.py"
+"In TRAE, open the file src/app.ts and find the bug"
+"In TRAE, search for all usages of login function"
+
+# SOLO Mode — I paste task into SOLO chat and it does the work
+"In TRAE, in SOLO Builder mode, build a REST API"
+"In TRAE, in SOLO Coder mode, fix the login bug in auth.ts"
+"In TRAE, SOLO mode, refactor the database layer"
+
+# SOLO + Tools — I toggle SOLO on, paste task, you hit Enter
+"In TRAE, SOLO Builder, create a todo app with Python Flask"
+
+# MCP Management
+"List the MCP servers in TRAE"
+"Add the GitHub MCP to TRAE"
+"Open the MCP settings in TRAE"
+
+# General
+"Switch to SOLO mode in TRAE"
+"Switch back to IDE mode"
+```
 
 ---
 

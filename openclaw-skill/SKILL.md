@@ -4,6 +4,36 @@
 
 ---
 
+## How Users Talk to the Agent (Voice Commands)
+
+```
+# IDE Mode — agent uses file tools directly in TRAE
+"In TRAE, IDE mode, create a new Python file called hello.py"
+"In TRAE, open the file src/app.ts and find the bug"
+"In TRAE, search for all usages of login function"
+"In TRAE, IDE, create a test file for auth.py"
+
+# SOLO Mode — agent delegates to TRAE's SOLO agent via chat
+"In TRAE, SOLO Builder mode, build a REST API"
+"In TRAE, SOLO Coder mode, fix the login bug in auth.ts"
+"In TRAE, SOLO Builder, create a Flask todo app"
+"In TRAE, SOLO mode, add user authentication to the app"
+
+# SOLO + clipboard paste (agent pastes, user presses Enter)
+"In TRAE, SOLO Builder, create a microservices architecture diagram"
+
+# MCP Management
+"List the MCP servers in TRAE"
+"Add the GitHub MCP to TRAE"
+"Open the MCP settings in TRAE"
+
+# Mode switching
+"Switch to SOLO mode in TRAE"
+"Switch back to IDE mode in TRAE"
+```
+
+---
+
 ## Architecture
 
 ```
