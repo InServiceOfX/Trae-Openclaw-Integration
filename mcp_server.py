@@ -137,6 +137,82 @@ def get_symbols_tool(path: str) -> dict:
         pass
     return {"path": abs_path, "symbols": symbols}
 
+# ─── GitHub Tools (via gh CLI) ───────────────────────────────────────────────
+
+def github_search_repos_tool(params: dict) -> dict:
+    import subprocess
+    query = params.get("query", "")
+    per_page = params.get("perPage", 5)
+    try:
+        result = subprocess.run(
+            ["gh", "api", "search/repositories", "-q", ".[] | {name: .name, full_name: .full_name, description: .description, stars: .stargazers_count, language: .language, url: .html_url}", "-F", f"query={query}", "-L", str(per_page)],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode != 0:
+            return {"error": result.stderr or "gh api failed", "items": []}
+        items = []
+        for line in result.stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = dict(zip(["name","full_name","description","stars","language","url"], line.split("|")))
+            items.append(parts)
+        return {"query": query, "items": items, "count": len(items)}
+    except Exception as e:
+        return {"error": str(e), "items": []}
+
+def github_list_issues_tool(params: dict) -> dict:
+    import subprocess
+    owner = params.get("owner", "InServiceOfX")
+    repo = params.get("repo", "Trae-Openclaw-Integration")
+    state = params.get("state", "open")
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "list", "--repo", f"{owner}/{repo}", "--state", state, "--limit", str(params.get("perPage", 10)), "--json", "number,title,state,url,labels"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            return {"error": result.stderr or "gh issue list failed", "issues": []}
+        import json
+        issues = json.loads(result.stdout)
+        return {"owner": owner, "repo": repo, "state": state, "issues": issues, "count": len(issues)}
+    except Exception as e:
+        return {"error": str(e), "issues": []}
+
+def github_get_repo_tool(params: dict) -> dict:
+    import subprocess
+    owner = params.get("owner", "InServiceOfX")
+    repo = params.get("repo", "Trae-Openclaw-Integration")
+    try:
+        result = subprocess.run(
+            ["gh", "repo", "view", f"{owner}/{repo}", "--json", "name,description,url,stars,language,defaultBranchRef,pushedAt"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            return {"error": result.stderr or "gh repo view failed"}
+        import json
+        return json.loads(result.stdout)
+    except Exception as e:
+        return {"error": str(e)}
+
+def github_create_issue_tool(params: dict) -> dict:
+    import subprocess
+    owner = params.get("owner", "InServiceOfX")
+    repo = params.get("repo", "Trae-Openclaw-Integration")
+    title = params.get("title", "")
+    body = params.get("body", "")
+    if not title:
+        return {"error": "title is required"}
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "create", "--repo", f"{owner}/{repo}", "--title", title, "--body", body],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            return {"error": result.stderr or "gh issue create failed"}
+        return {"success": True, "url": result.stdout.strip()}
+    except Exception as e:
+        return {"error": str(e)}
+
 # ─── Tool Registry ─────────────────────────────────────────────────────────────
 
 TOOLS = {
@@ -182,6 +258,28 @@ TOOLS = {
         "description": "Get code symbols from a file",
         "params": ["path"],
         "fn": lambda params: get_symbols_tool(params.get("path", "")),
+    },
+
+    # GitHub tools (via gh CLI — no node/npx needed)
+    "github_search_repos": {
+        "description": "Search GitHub repositories",
+        "params": ["query", "perPage"],
+        "fn": lambda params: github_search_repos_tool(params),
+    },
+    "github_list_issues": {
+        "description": "List GitHub issues on a repo",
+        "params": ["owner", "repo", "state", "perPage"],
+        "fn": lambda params: github_list_issues_tool(params),
+    },
+    "github_get_repo": {
+        "description": "Get GitHub repo metadata",
+        "params": ["owner", "repo"],
+        "fn": lambda params: github_get_repo_tool(params),
+    },
+    "github_create_issue": {
+        "description": "Create a GitHub issue",
+        "params": ["owner", "repo", "title", "body"],
+        "fn": lambda params: github_create_issue_tool(params),
     },
 }
 

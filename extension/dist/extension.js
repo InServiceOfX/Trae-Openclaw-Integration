@@ -867,24 +867,77 @@ const TOOLS = {
             }, 30000);
         });
     },
-    // ── GitHub convenience wrappers ────────────────────────────────────────────
+    // ── GitHub tools (via gh CLI — no npx needed) ────────────────────────────
     github_search_repos: async (params) => {
         const query = params.query || '';
         const perPage = params.perPage || 5;
-        return await TOOLS['call_mcp_server']({
-            server: 'github',
-            tool: 'search_repositories',
-            arguments: { query, perPage }
+        return new Promise((resolve) => {
+            const proc = (0, child_process_1.spawn)('gh', ['api', 'search/repositories', '-q', '.[] | {name:.name,full_name:.full_name,description:.description,stars:.stargazers_count,language:.language,url:.html_url}', '-F', `query=${query}`, '-L', String(perPage)], { env: { ...process.env, HOME: os.homedir() } });
+            let stdout = '', stderr = '';
+            proc.stdout.on('data', (c) => stdout += c.toString());
+            proc.stderr.on('data', (c) => stderr += c.toString());
+            proc.on('close', (code) => {
+                if (code !== 0) {
+                    resolve({ success: false, error: stderr || `gh exited ${code}` });
+                    return;
+                }
+                const items = stdout.trim().split('\n').filter(Boolean).map(line => {
+                    const parts = line.split('|');
+                    return { name: parts[0] || '', full_name: parts[1] || '', description: parts[2] || '', stars: parseInt(parts[3] || '0'), language: parts[4] || '', url: parts[5] || '' };
+                });
+                resolve({ success: true, query, items, count: items.length });
+            });
+            proc.on('error', (e) => resolve({ success: false, error: e.message }));
+            setTimeout(() => { proc.kill(); resolve({ success: false, error: 'Timeout' }); }, 15000);
         });
     },
     github_list_issues: async (params) => {
         const owner = params.owner || 'InServiceOfX';
         const repo = params.repo || 'Trae-Openclaw-Integration';
         const state = params.state || 'open';
-        return await TOOLS['call_mcp_server']({
-            server: 'github',
-            tool: 'list_issues_for_repo',
-            arguments: { owner, repo, state, perPage: params.perPage || 10 }
+        return new Promise((resolve) => {
+            const proc = (0, child_process_1.spawn)('gh', ['issue', 'list', '--repo', `${owner}/${repo}`, '--state', state, '--limit', String(params.perPage || 10), '--json', 'number,title,state,url,labels'], { env: { ...process.env, HOME: os.homedir() } });
+            let stdout = '', stderr = '';
+            proc.stdout.on('data', (c) => stdout += c.toString());
+            proc.stderr.on('data', (c) => stderr += c.toString());
+            proc.on('close', (code) => {
+                if (code !== 0) {
+                    resolve({ success: false, error: stderr || `gh exited ${code}` });
+                    return;
+                }
+                try {
+                    resolve({ success: true, issues: JSON.parse(stdout), count: JSON.parse(stdout).length });
+                }
+                catch {
+                    resolve({ success: false, error: 'JSON parse failed' });
+                }
+            });
+            proc.on('error', (e) => resolve({ success: false, error: e.message }));
+            setTimeout(() => { proc.kill(); resolve({ success: false, error: 'Timeout' }); }, 10000);
+        });
+    },
+    github_get_repo: async (params) => {
+        const owner = params.owner || 'InServiceOfX';
+        const repo = params.repo || 'Trae-Openclaw-Integration';
+        return new Promise((resolve) => {
+            const proc = (0, child_process_1.spawn)('gh', ['repo', 'view', `${owner}/${repo}`, '--json', 'name,description,url,stargazerCount,primaryLanguage,pushedAt,defaultBranchRef'], { env: { ...process.env, HOME: os.homedir() } });
+            let stdout = '', stderr = '';
+            proc.stdout.on('data', (c) => stdout += c.toString());
+            proc.stderr.on('data', (c) => stderr += c.toString());
+            proc.on('close', (code) => {
+                if (code !== 0) {
+                    resolve({ success: false, error: stderr || `gh exited ${code}` });
+                    return;
+                }
+                try {
+                    resolve({ success: true, ...JSON.parse(stdout) });
+                }
+                catch {
+                    resolve({ success: false, error: 'JSON parse failed' });
+                }
+            });
+            proc.on('error', (e) => resolve({ success: false, error: e.message }));
+            setTimeout(() => { proc.kill(); resolve({ success: false, error: 'Timeout' }); }, 10000);
         });
     },
     github_create_issue: async (params) => {
@@ -894,19 +947,20 @@ const TOOLS = {
         const body = params.body || '';
         if (!title)
             throw new Error('Missing required parameter: title');
-        return await TOOLS['call_mcp_server']({
-            server: 'github',
-            tool: 'create_issue',
-            arguments: { owner, repo, title, body }
-        });
-    },
-    github_get_repo: async (params) => {
-        const owner = params.owner || 'InServiceOfX';
-        const repo = params.repo || 'Trae-Openclaw-Integration';
-        return await TOOLS['call_mcp_server']({
-            server: 'github',
-            tool: 'get_repository',
-            arguments: { owner, repo }
+        return new Promise((resolve) => {
+            const proc = (0, child_process_1.spawn)('gh', ['issue', 'create', '--repo', `${owner}/${repo}`, '--title', title, '--body', body], { env: { ...process.env, HOME: os.homedir() } });
+            let stdout = '', stderr = '';
+            proc.stdout.on('data', (c) => stdout += c.toString());
+            proc.stderr.on('data', (c) => stderr += c.toString());
+            proc.on('close', (code) => {
+                if (code !== 0) {
+                    resolve({ success: false, error: stderr || `gh exited ${code}` });
+                    return;
+                }
+                resolve({ success: true, url: stdout.trim() });
+            });
+            proc.on('error', (e) => resolve({ success: false, error: e.message }));
+            setTimeout(() => { proc.kill(); resolve({ success: false, error: 'Timeout' }); }, 10000);
         });
     },
     // ── Docker convenience wrappers ───────────────────────────────────────────
