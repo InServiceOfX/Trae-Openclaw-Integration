@@ -1,0 +1,64 @@
+{
+  "name": "trae-openclaw-mcp",
+  "displayName": "TRAE OpenClaw MCP Server",
+  "description": "Exposes TRAE IDE capabilities as an MCP server for OpenClaw orchestration",
+  "version": "0.1.0",
+  "publisher": "inserviceofx",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:trae-openclaw-mcp.start",
+    "onCommand:trae-openclaw-mcp.stop",
+    "onCommand:trae-openclaw-mcp.status"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "trae-openclaw-mcp.start",
+        "title": "TRAE MCP: Start Server"
+      },
+      {
+        "command": "trae-openclaw-mcp.stop",
+        "title": "TRAE MCP: Stop Server"
+      },
+      {
+        "command": "trae-openclaw-mcp.status",
+        "title": "TRAE MCP: Status"
+      },
+      {
+        "command": "trae-openclaw-mcp.runTask",
+        "title": "TRAE MCP: Run Task"
+      }
+    ],
+    "configuration": {
+      "title": "TRAE OpenClaw MCP",
+      "properties": {
+        "traeOpenclawMcp.socketPath": {
+          "type": "string",
+          "default": "/tmp/trae-openclaw-mcp.sock",
+          "description": "Unix socket path for MCP server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.84.0",
+    "@vscode/vsce": "^2.21.0",
+    "typescript": "^5.0.0"
+  }
+}
