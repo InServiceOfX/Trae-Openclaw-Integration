@@ -786,6 +786,8 @@ const TOOLS = {
                 env[k] = v;
             }
         }
+        // Note: Docker MCP servers may need DOCKER_CONTEXT set if using non-default context
+        // For most cases, the default Docker context works without setting this explicitly
         if (serverConfig.env) {
             for (const [k, v] of Object.entries(serverConfig.env)) {
                 env[k] = v;
@@ -858,6 +860,81 @@ const TOOLS = {
                 resolve({ success: false, server: serverName, error: 'Timeout after 30s' });
             }, 30000);
         });
+    },
+    // ── GitHub convenience wrappers ────────────────────────────────────────────
+    github_search_repos: async (params) => {
+        const query = params.query || '';
+        const perPage = params.perPage || 5;
+        return await TOOLS['call_mcp_server']({
+            server: 'github',
+            tool: 'search_repositories',
+            arguments: { query, perPage }
+        });
+    },
+    github_list_issues: async (params) => {
+        const owner = params.owner || 'InServiceOfX';
+        const repo = params.repo || 'Trae-Openclaw-Integration';
+        const state = params.state || 'open';
+        return await TOOLS['call_mcp_server']({
+            server: 'github',
+            tool: 'list_issues_for_repo',
+            arguments: { owner, repo, state, perPage: params.perPage || 10 }
+        });
+    },
+    github_create_issue: async (params) => {
+        const owner = params.owner || 'InServiceOfX';
+        const repo = params.repo || 'Trae-Openclaw-Integration';
+        const title = params.title;
+        const body = params.body || '';
+        if (!title)
+            throw new Error('Missing required parameter: title');
+        return await TOOLS['call_mcp_server']({
+            server: 'github',
+            tool: 'create_issue',
+            arguments: { owner, repo, title, body }
+        });
+    },
+    github_get_repo: async (params) => {
+        const owner = params.owner || 'InServiceOfX';
+        const repo = params.repo || 'Trae-Openclaw-Integration';
+        return await TOOLS['call_mcp_server']({
+            server: 'github',
+            tool: 'get_repository',
+            arguments: { owner, repo }
+        });
+    },
+    // ── Docker convenience wrappers ───────────────────────────────────────────
+    docker_list_containers: async (params) => {
+        return await TOOLS['call_mcp_server']({
+            server: 'docker',
+            tool: 'list_containers',
+            arguments: { all: params.all !== false }
+        });
+    },
+    docker_list_images: async (params) => {
+        return await TOOLS['call_mcp_server']({
+            server: 'docker',
+            tool: 'list_images',
+            arguments: {}
+        });
+    },
+    docker_get_logs: async (params) => {
+        const containerId = params.container;
+        if (!containerId)
+            throw new Error('Missing required parameter: container');
+        return await TOOLS['call_mcp_server']({
+            server: 'docker',
+            tool: 'get_container_logs',
+            arguments: { containerId, stdout: true, stderr: true, tail: params.tail || 100 }
+        });
+    },
+    // ── SOLO / Deployment convenience wrappers ─────────────────────────────────
+    solo_build: async (params) => {
+        // Open SOLO Builder and trigger a build
+        await vscode.commands.executeCommand('trae.solo.mode.toggle').catch(() => { });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const task = params.task || 'Build the project';
+        return await TOOLS['send_to_solo_chat']({ text: task });
     },
 };
 // ─── Helpers ─────────────────────────────────────────────────────────────────
