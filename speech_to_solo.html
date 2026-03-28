@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Voice → SOLO Chat</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 40px; background: #1e1e1e; color: #fff; }
+  button { padding: 15px 30px; font-size: 18px; border-radius: 8px; border: none; cursor: pointer; }
+  #startBtn { background: #4caf50; color: white; }
+  #startBtn:hover { background: #45a049; }
+  #stopBtn { background: #f44336; color: white; display: none; }
+  #status { margin: 20px 0; font-size: 18px; color: #aaa; }
+  #transcript { background: #2d2d2d; padding: 15px; border-radius: 8px; min-height: 60px; margin: 20px 0; }
+  #sendBtn { background: #2196f3; color: white; display: none; padding: 10px 20px; font-size: 14px; }
+  #sendBtn:hover { background: #1976d2; }
+  #socketStatus { float: right; font-size: 14px; }
+</style>
+</head>
+<body>
+  <div id="socketStatus">Socket: waiting...</div>
+  <h1>🎙️ Voice to SOLO Chat</h1>
+  <p>Hold to speak, then click Send to paste into SOLO chat</p>
+  
+  <button id="startBtn">🎤 Hold to Speak</button>
+  <button id="stopBtn">⏹️ Stop</button>
+  
+  <div id="status">Ready</div>
+  <div id="transcript">Your words will appear here...</div>
+  
+  <button id="sendBtn">📤 Send to SOLO Chat</button>
+  
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const sendBtn = document.getElementById('sendBtn');
+    const status = document.getElementById('status');
+    const transcriptDiv = document.getElementById('transcript');
+    const socketStatus = document.getElementById('socketStatus');
+    
+    let recognition;
+    let transcript = '';
+    
+    // Check for Web Speech API support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      status.textContent = '❌ Speech Recognition not supported in this browser';
+      startBtn.disabled = true;
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      
+      socketStatus.textContent = '✅ Browser speech recognition ready';
+      
+      recognition.onstart = () => {
+        status.textContent = '🎙️ Listening...';
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+      };
+      
+      recognition.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            transcript += t + ' ';
+          } else {
+            interim += t;
+          }
+        }
+        transcriptDiv.textContent = transcript + (interim ? `[${interim}]` : '');
+      };
+      
+      recognition.onerror = (event) => {
+        status.textContent = '❌ Error: ' + event.error;
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+      };
+      
+      recognition.onend = () => {
+        status.textContent = '✅ Done. Review transcript below.';
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        if (transcript.trim()) {
+          sendBtn.style.display = 'inline-block';
+        }
+      };
+    }
+    
+    startBtn.addEventListener('click', () => {
+      transcript = '';
+      transcriptDiv.textContent = '...';
+      sendBtn.style.display = 'none';
+      recognition.start();
+    });
+    
+    stopBtn.addEventListener('click', () => {
+      recognition.stop();
+    });
+    
+    sendBtn.addEventListener('click', () => {
+      const text = transcript.trim();
+      if (!text) return;
+      
+      // Send to our MCP server via fetch
+      const payload = {
+        jsonrpc: '2.0',
+        id: '1',
+        method: 'tools/call',
+        params: {
+          name: 'send_to_solo_chat',
+          arguments: { text: text }
+        }
+      };
+      
+      // Try to connect to the MCP socket via a local proxy
+      // Since we can't directly connect from browser, we'll copy to clipboard
+      navigator.clipboard.writeText(text).then(() => {
+        status.textContent = '📋 Copied! Paste into SOLO chat (Ctrl+V in SOLO input)';
+        sendBtn.textContent = '✅ Copied!';
+      }).catch(() => {
+        status.textContent = '❌ Copy failed';
+      });
+    });
+  </script>
+</body>
+</html>
