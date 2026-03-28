@@ -18,7 +18,7 @@ Start OBS recording.
 **[SCREENCAP]** Show TRAE IDE on left, openclaw-tui terminal on right.
 
 **[NARRATE]**
-> "OpenClaw is an AI agent that orchestrates the TRAE IDE through its MCP — Model Context Protocol — infrastructure. It connects to TRAE as a local MCP server, enabling full IDE control through text commands."
+> "Use OpenClaw to interface into TRAE and power your OpenClaw session with TRAE. Through its MCP — Model Context Protocol — infrastructure, OpenClaw connects to TRAE as a local MCP server, enabling full IDE control through text commands."
 
 ---
 
@@ -31,7 +31,7 @@ Start OBS recording.
 Click to select. Reload window.
 
 **[NARRATE]**
-> "This is a real, installable TRAE extension. You can install it into any TRAE or VS Code IDE — here's the installation process live."
+> "It's easy to install as an extension inside of TRAE — here's the installation process."
 
 ---
 
@@ -64,7 +64,7 @@ List Docker containers via TRAE MCP
 Press Enter. Show container list.
 
 **[NARRATE]**
-> "Same architecture — Docker containers listed through TRAE MCP. Here you see a llama.cpp server running Qwen3.5 locally, and a Postgres database."
+> "Likewise, directly through TRAE's MCP, list docker containers ..."
 
 ---
 
@@ -94,7 +94,7 @@ https://github.com/InServiceOfX/Trae-Openclaw-Integration
 ```
 
 **[NARRATE]**
-> "Trae-Openclaw-Integration — a real, installable extension that brings OpenClaw agent orchestration to TRAE IDE. Built with TRAE AI."
+> "Trae-Openclaw-Integration — a real, installable extension that brings OpenClaw agent orchestration to TRAE IDE. Built with Minimax."
 
 ---
 
@@ -156,19 +156,19 @@ Then open: https://github.com/InServiceOfX/Trae-Openclaw-Integration
 
 **Project Name:** TRAE-OpenClaw Integration
 
-**Tagline:** An installable TRAE extension that lets any OpenClaw AI agent orchestrate the IDE through MCP — controlling GitHub, Docker, file operations, and SOLO agent mode via text commands.
+**Tagline:** Use OpenClaw to interface into TRAE and power your OpenClaw session with TRAE's MCP infrastructure — controlling GitHub, Docker, and SOLO agent mode via text commands.
 
 **Description:**
 
-This project demonstrates a deep integration between OpenClaw — an AI agent powered by MiniMax — and the TRAE IDE. The core innovation is an installable VS Code/TRAE extension that exposes an MCP server, allowing OpenClaw to:
+This project demonstrates a deep integration between OpenClaw and the TRAE IDE. The core innovation is an installable TRAE extension that exposes an MCP server, allowing OpenClaw to:
 
 1. Call external MCP tools (GitHub API, Docker, Filesystem) through TRAE's infrastructure
-2. Control TRAE's SOLO agent mode — switching between IDE and SOLO
-3. Execute file operations, terminal commands, and workspace management directly
+2. Control TRAE's SOLO agent mode — switching between IDE and SOLO directly
+3. Execute file operations, terminal commands, and workspace management
 4. Create custom agents within TRAE programmatically
 
-The system uses the MiniMax M2.7 model as the reasoning layer that interprets commands and routes them through TRAE's MCP infrastructure to external services (GitHub, Docker) and internal IDE controls (SOLO mode).
+OpenClaw connects to this extension over a local Unix socket, routing commands through TRAE's MCP infrastructure to external services and IDE controls.
 
-**Built with:** TRAE AI, MiniMax API (M2.7)
+**Built with:** TRAE AI, MiniMax API
 
 **GitHub:** https://github.com/InServiceOfX/Trae-Openclaw-Integration
