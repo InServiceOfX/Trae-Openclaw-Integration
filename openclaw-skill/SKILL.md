@@ -112,8 +112,9 @@ for attempt in range(5):
 | `start_solo_mode` | Toggle TRAE SOLO mode on/off | — |
 | `send_to_solo_chat` | Type text into SOLO chat (clipboard paste) | `text` |
 | `open_mcp_config` | Open TRAE MCP settings UI | `scope` (opt) |
-| `list_mcp_servers` | List configured MCP servers | — |
+| `list_mcp_servers` | List all TRAE MCP servers (User + Global) | — |
 | `add_mcp_server` | Add an MCP server to TRAE config | `name`, `command`, `args` |
+| `call_mcp_server` | Call any TRAE MCP server's tool directly | `server`, `tool`, `arguments` |
 
 ---
 
@@ -420,6 +421,38 @@ result = call_tool(sock, "add_mcp_server", {
 ```
 
 **Trigger:** *"Add a new MCP server to TRAE"*, *"Register our integration MCP server in TRAE"*
+
+---
+
+### `call_mcp_server`
+
+Call any MCP server that TRAE has configured (memory, github, docker, etc.)
+OpenClaw uses this to route MCP tool calls through TRAE's MCP infrastructure.
+
+```python
+# List GitHub repos via TRAE's GitHub MCP server
+result = call_tool(sock, "call_mcp_server", {
+    "server": "github",
+    "tool": "search_repositories",
+    "arguments": {"query": "user:InServiceOfX", "perPage": 5}
+})
+# Returns: {success: true, server: "github", response: {result: {content: [...]}}}
+
+# Read memory MCP store
+result = call_tool(sock, "call_mcp_server", {
+    "server": "memory",
+    "tool": "memory_search",
+    "arguments": {"query": "project ideas"}
+})
+
+# Get available tools from any MCP server
+result = call_tool(sock, "call_mcp_server", {
+    "server": "github",
+    "method": "tools/list"
+})
+```
+
+**Trigger:** *"Search GitHub repos via TRAE MCP"*, *"Query memory MCP for project notes"*, *"Call docker MCP to list containers"*
 
 ---
 

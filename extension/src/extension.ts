@@ -412,14 +412,31 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     try {
       // Copy text to clipboard
       await vscode.env.clipboard.writeText(text);
-      // Show the AI chat panel
-      await vscode.commands.executeCommand('icube.ai-chat.focusInput');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // Paste from clipboard (Ctrl+V / Cmd+V)
+    } catch (e) {
+      return { success: false, error: 'Failed to copy to clipboard: ' + String(e) };
+    }
+    // Try multiple approaches to open chat and paste
+    const chatCommands = [
+      'icube.ai-chat.focusInput',
+      'workbench.action.chat.open',
+      'workbench.action.openChat',
+      'TRAE.ai-chat.focusInput',
+    ];
+    for (const cmd of chatCommands) {
+      try {
+        await vscode.commands.executeCommand(cmd);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        break;
+      } catch {
+        // Try next command
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
       await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
       return { success: true, action: 'text_pasted', note: 'Text pasted into SOLO chat. Press Enter to send.' };
     } catch (e) {
-      return { success: false, error: String(e) };
+      return { success: false, error: String(e), hint: 'Could not paste automatically. Try Ctrl+V in the chat input.' };
     }
   },
 
@@ -444,22 +461,32 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     }
   },
 
-  // List MCP servers from the TRAE MCP configuration
+  // List MCP servers from ALL TRAE MCP configurations (User + Global)
   list_mcp_servers: async (params: Record<string, unknown>) => {
     try {
-      const mcpPath = path.join(os.homedir(), '.config', 'Trae', 'mcp.json');
-      const content = await fs.promises.readFile(mcpPath, 'utf-8');
-      const config = JSON.parse(content);
-      const servers = config.mcpServers || {};
+      const configs = [
+        { path: path.join(os.homedir(), '.config', 'Trae', 'mcp.json'), scope: 'global' },
+        { path: path.join(os.homedir(), '.config', 'Trae', 'User', 'mcp.json'), scope: 'user' },
+      ];
+      const allServers: Record<string, { name: string; scope: string; config: Record<string, unknown> }> = {};
+      for (const cfg of configs) {
+        try {
+          const content = await fs.promises.readFile(cfg.path, 'utf-8');
+          const config = JSON.parse(content);
+          const servers = config.mcpServers || {};
+          for (const [name, serverCfg] of Object.entries(servers)) {
+            allServers[name] = { name, scope: cfg.scope, config: serverCfg as Record<string, unknown> };
+          }
+        } catch {
+          // Config doesn't exist, skip
+        }
+      }
       return {
-        configPath: mcpPath,
-        servers: Object.entries(servers).map(([name, cfg]) => ({
-          name,
-          config: cfg as Record<string, unknown>,
-        })),
+        servers: Object.values(allServers),
+        note: 'User config overrides global config for same server name'
       };
     } catch (e) {
-      return { success: false, error: String(e), hint: 'MCP config may not exist yet. Use open_mcp_config to open settings.' };
+      return { success: false, error: String(e) };
     }
   },
 
@@ -485,6 +512,126 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     } catch (e) {
       return { success: false, error: String(e) };
     }
+  },
+
+  // Call any MCP server configured in TRAE (memory, github, docker, etc.)
+  // OpenClaw uses this to route MCP tool calls through TRAE's MCP infrastructure
+  call_mcp_server: async (params: Record<string, unknown>) => {
+    const serverName = params.server as string;
+    const method = (params.method as string) || 'tools/call';
+    const toolName = params.tool as string;
+    const toolArgs = (params.arguments as Record<string, unknown>) || {};
+
+    if (!serverName) throw new Error('Missing required parameter: server');
+    if (!toolName && method === 'tools/call') throw new Error('Missing required parameter: tool');
+
+    // Find the server config in User or global mcp.json
+    const configs = [
+      path.join(os.homedir(), '.config', 'Trae', 'User', 'mcp.json'),
+      path.join(os.homedir(), '.config', 'Trae', 'mcp.json'),
+    ];
+
+    let serverConfig: { command: string; args: string[]; env?: Record<string, string> } | null = null;
+    let configPath = '';
+
+    for (const cfgPath of configs) {
+      try {
+        const content = await fs.promises.readFile(cfgPath, 'utf-8');
+        const config = JSON.parse(content);
+        if (config.mcpServers && (config.mcpServers as Record<string, unknown>)[serverName]) {
+          serverConfig = (config.mcpServers as Record<string, { command: string; args: string[]; env?: Record<string, string> }>)[serverName];
+          configPath = cfgPath;
+          break;
+        }
+      } catch {
+        // Skip missing files
+      }
+    }
+
+    if (!serverConfig) {
+      return { success: false, error: `MCP server '${serverName}' not found in TRAE config`, hint: 'Use list_mcp_servers to see available servers' };
+    }
+
+    // Build environment with token replacement
+    const env: Record<string, string> = {};
+    for (const [k, v] of Object.entries(process.env)) {
+      if (v !== undefined) { env[k] = v; }
+    }
+    if (serverConfig.env) {
+      for (const [k, v] of Object.entries(serverConfig.env)) {
+        env[k] = v as string;
+      }
+    }
+
+    // Spawn MCP server
+    const reqId = Date.now().toString();
+    let requestPayload: Record<string, unknown>;
+    if (method === 'tools/call') {
+      requestPayload = { jsonrpc: '2.0', id: reqId, method: 'tools/call', params: { name: toolName, arguments: toolArgs } };
+    } else if (method === 'tools/list') {
+      requestPayload = { jsonrpc: '2.0', id: reqId, method: 'tools/list', params: {} };
+    } else if (method === 'ping') {
+      requestPayload = { jsonrpc: '2.0', id: reqId, method: 'ping', params: {} };
+    } else {
+      requestPayload = { jsonrpc: '2.0', id: reqId, method: method, params: toolArgs };
+    }
+
+    return new Promise((resolve) => {
+      const proc = spawn(serverConfig!.command, serverConfig!.args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout!.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString();
+        // Try to parse complete JSON-RPC response(s)
+        const lines = stdout.split('\n');
+        stdout = lines.pop() || '';
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const resp = JSON.parse(line);
+              proc.kill();
+              resolve({
+                success: true,
+                server: serverName,
+                configPath,
+                request: requestPayload,
+                response: resp,
+              });
+              return;
+            } catch {
+              // Not complete JSON yet
+            }
+          }
+        }
+      });
+
+      proc.stderr!.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (stderr) {
+          resolve({ success: false, server: serverName, error: `Process exited with code ${code}`, stderr: stderr.substring(0, 1000) });
+        } else {
+          resolve({ success: false, server: serverName, error: `No response from MCP server (exit code ${code})` });
+        }
+      });
+
+      proc.on('error', (err) => {
+        resolve({ success: false, server: serverName, error: `Failed to spawn server: ${err.message}` });
+      });
+
+      // Send request
+      proc.stdin!.write(JSON.stringify(requestPayload) + '\n');
+      proc.stdin!.end();
+
+      // Timeout after 30s
+      setTimeout(() => {
+        proc.kill();
+        resolve({ success: false, server: serverName, error: 'Timeout after 30s' });
+      }, 30000);
+    });
   },
 };
 
