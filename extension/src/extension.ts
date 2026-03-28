@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { exec, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 
@@ -332,43 +333,157 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     };
   },
 
-  // Invoke TRAE SOLO agent (via SOLO mode + chat send)
+  // Invoke TRAE SOLO agent via AI chat service
   invoke_solo_agent: async (params: Record<string, unknown>) => {
     const task = params.task as string;
     if (!task) throw new Error('Missing required parameter: task');
-    try {
-      // Step 1: Ensure SOLO mode is active
-      await vscode.commands.executeCommand('trae.solo.mode.toggle');
-    } catch {
-      // Continue even if toggle fails (might already be in SOLO mode)
-    }
-    try {
-      // Step 2: Focus the chat input
-      await vscode.commands.executeCommand('icube.ai-chat.focusInput');
-    } catch {
-      // Fallback: just try to send the message
-    }
-    try {
-      // Step 3: Send the task as a message to the AI chat
-      // The sendMessage command takes a string or structured input
-      const result = await vscode.commands.executeCommand('icube.ai-chat.sendMessage', task);
-      return { success: true, result, mode: 'solo' };
-    } catch (e) {
-      // Try alternative: add to chat first
-      try {
-        await vscode.commands.executeCommand('icube.ai-chat.plainText.addToChat', task);
-        await vscode.commands.executeCommand('icube.ai-chat.sendMessage', '');
-        return { success: true, mode: 'solo_fallback', task };
-      } catch (e2) {
-        const msg = e2 instanceof Error ? e2.message : String(e2);
-        return {
-          success: false,
-          mode: 'solo',
-          instruction: task,
-          error: msg,
-          hint: 'SOLO agent could not be reached. Try opening SOLO mode manually in TRAE.'
-        };
+    
+    // Strategy: use the AI chat's setInputText + send approach
+    // Try a sequence of approaches
+    const approaches = [
+      // Approach 1: Try focusInput + typeText via keyboard simulation
+      async () => {
+        try {
+          await vscode.commands.executeCommand('icube.ai-chat.focusInput');
+          // After focusing, the input should be ready
+          // We can't easily type text, but we can try to send
+          const r = await vscode.commands.executeCommand('icube.ai-chat.sendMessage', task);
+          return { success: true, approach: 'focusInput+sendMessage', result: r };
+        } catch { return null; }
+      },
+      // Approach 2: Try updateChatInputText if it exists
+      async () => {
+        try {
+          const r = await vscode.commands.executeCommand('icube.chat.updateCommandState', { type: 'input', text: task });
+          return { success: true, approach: 'updateCommandState', result: r };
+        } catch { return null; }
+      },
+      // Approach 3: Toggle SOLO mode, then try sendMessage
+      async () => {
+        try {
+          await vscode.commands.executeCommand('trae.solo.mode.toggle');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const r = await vscode.commands.executeCommand('icube.ai-chat.sendMessage', task);
+          return { success: true, approach: 'soloToggle+sendMessage', result: r };
+        } catch { return null; }
+      },
+      // Approach 4: Just try sendMessage directly
+      async () => {
+        try {
+          const r = await vscode.commands.executeCommand('icube.ai-chat.sendMessage', task);
+          return { success: true, approach: 'sendMessageDirect', result: r };
+        } catch (e) {
+          return { success: false, approach: 'sendMessageDirect', error: String(e) };
+        }
+      },
+    ];
+
+    for (const approach of approaches) {
+      const result = await approach();
+      if (result && result.success) {
+        return result;
       }
+    }
+
+    return {
+      success: false,
+      mode: 'solo',
+      instruction: task,
+      hint: 'Could not reach SOLO agent. Try opening SOLO mode manually in TRAE, or use file-based tools directly.',
+      available_commands: ['trae.solo.mode.toggle', 'icube.ai-chat.focusInput'],
+    };
+  },
+
+  // Toggle TRAE SOLO mode on/off
+  start_solo_mode: async (params: Record<string, unknown>) => {
+    try {
+      await vscode.commands.executeCommand('trae.solo.mode.toggle');
+      return { success: true, action: 'solo_mode_toggled' };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  },
+
+  // Type text into the SOLO chat input using clipboard paste
+  // This is a workaround since icube.ai-chat commands are webview-only
+  send_to_solo_chat: async (params: Record<string, unknown>) => {
+    const text = params.text as string;
+    if (!text) throw new Error('Missing required parameter: text');
+    try {
+      // Copy text to clipboard
+      await vscode.env.clipboard.writeText(text);
+      // Show the AI chat panel
+      await vscode.commands.executeCommand('icube.ai-chat.focusInput');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // Paste from clipboard (Ctrl+V / Cmd+V)
+      await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+      return { success: true, action: 'text_pasted', note: 'Text pasted into SOLO chat. Press Enter to send.' };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  },
+
+  // Open the MCP configuration in TRAE settings
+  open_mcp_config: async (params: Record<string, unknown>) => {
+    const scope = (params.scope as string) || 'user'; // 'user' or 'workspaceFolder'
+    try {
+      if (scope === 'workspaceFolder') {
+        await vscode.commands.executeCommand('workbench.agentExtensionWorkspaceConfig.open');
+      } else {
+        await vscode.commands.executeCommand('workbench.agentExtensionConfig.open');
+      }
+      return { success: true, action: 'mcp_config_opened', scope };
+    } catch (e) {
+      // Fallback: try generic settings open
+      try {
+        await vscode.commands.executeCommand('workbench.action.openSettings', { query: 'MCP' });
+        return { success: true, action: 'settings_opened', scope: 'settings' };
+      } catch (e2) {
+        return { success: false, error: String(e), fallback_error: String(e2) };
+      }
+    }
+  },
+
+  // List MCP servers from the TRAE MCP configuration
+  list_mcp_servers: async (params: Record<string, unknown>) => {
+    try {
+      const mcpPath = path.join(os.homedir(), '.config', 'Trae', 'mcp.json');
+      const content = await fs.promises.readFile(mcpPath, 'utf-8');
+      const config = JSON.parse(content);
+      const servers = config.mcpServers || {};
+      return {
+        configPath: mcpPath,
+        servers: Object.entries(servers).map(([name, cfg]) => ({
+          name,
+          config: cfg as Record<string, unknown>,
+        })),
+      };
+    } catch (e) {
+      return { success: false, error: String(e), hint: 'MCP config may not exist yet. Use open_mcp_config to open settings.' };
+    }
+  },
+
+  // Register a new MCP server in TRAE's mcp.json
+  add_mcp_server: async (params: Record<string, unknown>) => {
+    const name = params.name as string;
+    const command = params.command as string;
+    const args = (params.args as string[]) || [];
+    if (!name || !command) throw new Error('Missing required parameters: name, command');
+    try {
+      const mcpPath = path.join(os.homedir(), '.config', 'Trae', 'mcp.json');
+      let config: Record<string, unknown> = {};
+      try {
+        const content = await fs.promises.readFile(mcpPath, 'utf-8');
+        config = JSON.parse(content);
+      } catch {
+        // File doesn't exist yet
+      }
+      if (!config.mcpServers) { config.mcpServers = {}; }
+      (config.mcpServers as Record<string, unknown>)[name] = { command, args };
+      await fs.promises.writeFile(mcpPath, JSON.stringify(config, null, 2), 'utf-8');
+      return { success: true, action: 'mcp_server_added', name, configPath: mcpPath, note: 'TRAE needs to be reloaded to pick up changes: Ctrl+Shift+P → Developer: Reload Window' };
+    } catch (e) {
+      return { success: false, error: String(e) };
     }
   },
 };

@@ -79,6 +79,11 @@ for attempt in range(5):
 | `run_terminal_command` | Send command to TRAE terminal | `command`, `terminalName`, `waitMs` |
 | `get_terminal_output` | Get info about terminal / output file | `terminalName`, `lines` |
 | `invoke_solo_agent` | Delegate task to TRAE SOLO agent | `task` |
+| `start_solo_mode` | Toggle TRAE SOLO mode on/off | — |
+| `send_to_solo_chat` | Type text into SOLO chat (clipboard paste) | `text` |
+| `open_mcp_config` | Open TRAE MCP settings UI | `scope` (opt) |
+| `list_mcp_servers` | List configured MCP servers | — |
+| `add_mcp_server` | Add an MCP server to TRAE config | `name`, `command`, `args` |
 
 ---
 
@@ -318,6 +323,73 @@ else:
 
 sock.close()
 ```
+
+### `start_solo_mode`
+
+Toggle TRAE SOLO mode on or off. Use this to activate SOLO before delegating tasks.
+
+```python
+result = call_tool(sock, "start_solo_mode")
+# result = {"success": true, "action": "solo_mode_toggled"}
+```
+
+**Trigger:** *"Activate SOLO mode in TRAE"*, *"Switch to SOLO builder"*
+
+### `send_to_solo_chat`
+
+Type text into the SOLO chat input using clipboard paste. The text is copied to clipboard, pasted into the SOLO chat input (Ctrl+V), and the chat panel is focused.
+
+```python
+result = call_tool(sock, "send_to_solo_chat", {
+    "text": "Create a Python script that prints hello world"
+})
+# result = {"success": true, "action": "text_pasted", "note": "Text pasted. Press Enter to send."}
+```
+
+**Note:** After pasting, the user or the SOLO agent must press Enter to send the message.
+
+**Trigger:** *"Type into SOLO chat: create a hello world script"*, *"Ask SOLO to build a REST API"*
+
+### `open_mcp_config`
+
+Open the TRAE MCP configuration in the settings UI.
+
+```python
+# Open user-level MCP settings
+result = call_tool(sock, "open_mcp_config")
+# result = {"success": true, "action": "mcp_config_opened", "scope": "user"}
+
+# Open workspace-level MCP settings
+result = call_tool(sock, "open_mcp_config", {"scope": "workspaceFolder"})
+```
+
+**Trigger:** *"Open MCP settings in TRAE"*, *"Show me the MCP server configuration"*
+
+### `list_mcp_servers`
+
+List all MCP servers configured in TRAE's `mcp.json`.
+
+```python
+result = call_tool(sock, "list_mcp_servers")
+# result = {"configPath": "/home/ernest/.config/Trae/mcp.json", "servers": [{"name": "trae-openclaw", "config": {...}}]}
+```
+
+**Trigger:** *"What MCP servers are configured in TRAE?"*, *"Show me TRAE's MCP setup"*
+
+### `add_mcp_server`
+
+Register a new MCP server in TRAE's `mcp.json`. Requires a TRAE reload to take effect.
+
+```python
+result = call_tool(sock, "add_mcp_server", {
+    "name": "my-mcp-server",
+    "command": "python3",
+    "args": ["/path/to/mcp_server.py"]
+})
+# After adding, must reload TRAE: Ctrl+Shift+P → Developer: Reload Window
+```
+
+**Trigger:** *"Add a new MCP server to TRAE"*, *"Register our integration MCP server in TRAE"*
 
 ---
 
