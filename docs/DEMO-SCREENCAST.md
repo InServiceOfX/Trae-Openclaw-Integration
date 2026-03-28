@@ -107,6 +107,43 @@ https://github.com/InServiceOfX/Trae-Openclaw-Integration
 
 ---
 
+## QUICK REFERENCE — What to Type to Me
+
+These are the exact things to type to me during the demo:
+
+---
+
+**STEP 1 — Intro** *(no action needed, just talk)*
+
+---
+
+**STEP 2 — Install extension** *(show in TRAE, no typing)*
+
+---
+
+**STEP 3 — GitHub repos:**
+```
+Search GitHub repos via TRAE MCP
+```
+
+**STEP 4 — Docker containers:**
+```
+List Docker containers via TRAE MCP
+```
+
+**STEP 5 — SOLO mode:**
+```
+Switch to SOLO mode in TRAE
+```
+
+**STEP 6 — Back to IDE:**
+```
+Switch back to IDE mode
+```
+Then open: https://github.com/InServiceOfX/Trae-Openclaw-Integration
+
+---
+
 ## POST-RECORDING
 
 - Export OBS recording as MP4
