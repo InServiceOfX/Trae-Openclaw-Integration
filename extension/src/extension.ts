@@ -198,21 +198,177 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     }
   },
 
-  // Invoke TRAE SOLO agent (via internal command if available)
+  // List currently open editors in TRAE
+  get_open_editors: async () => {
+    const editors = vscode.window.visibleTextEditors;
+    const tabGroups = vscode.window.tabGroups?.all || [];
+
+    // Build a set from visible editors
+    const visiblePaths = new Set(editors.map(e => e.document.uri.fsPath));
+
+    // Collect all open tabs (visible or not)
+    const allTabs: Array<{ path: string; name: string; active: boolean; visible: boolean; isDirty: boolean; languageId: string }> = [];
+    for (const group of tabGroups) {
+      for (const tab of group.tabs) {
+        if (tab.input instanceof vscode.TabInputText) {
+          const fsPath = tab.input.uri.fsPath;
+          const doc = vscode.workspace.textDocuments.find(d => d.uri.fsPath === fsPath);
+          allTabs.push({
+            path: fsPath,
+            name: tab.label,
+            active: tab.isActive,
+            visible: visiblePaths.has(fsPath),
+            isDirty: doc?.isDirty ?? false,
+            languageId: doc?.languageId ?? 'unknown',
+          });
+        }
+      }
+    }
+
+    // Fallback: use visible editors if tab groups API isn't available
+    if (allTabs.length === 0) {
+      for (const editor of editors) {
+        allTabs.push({
+          path: editor.document.uri.fsPath,
+          name: editor.document.fileName,
+          active: editor === vscode.window.activeTextEditor,
+          visible: true,
+          isDirty: editor.document.isDirty,
+          languageId: editor.document.languageId,
+        });
+      }
+    }
+
+    const activeEditor = vscode.window.activeTextEditor;
+    return {
+      editors: allTabs,
+      activeEditor: activeEditor ? {
+        path: activeEditor.document.uri.fsPath,
+        languageId: activeEditor.document.languageId,
+        lineCount: activeEditor.document.lineCount,
+        selection: {
+          startLine: activeEditor.selection.start.line + 1,
+          startChar: activeEditor.selection.start.character,
+          endLine: activeEditor.selection.end.line + 1,
+          endChar: activeEditor.selection.end.character,
+        }
+      } : null,
+      count: allTabs.length,
+    };
+  },
+
+  // Run a command in the TRAE integrated terminal
+  run_terminal_command: async (params: Record<string, unknown>) => {
+    const command = params.command as string;
+    const terminalName = (params.terminalName as string) || 'TRAE MCP';
+    const waitMs = (params.waitMs as number) || 3000;
+    if (!command) throw new Error('Missing required parameter: command');
+
+    // Find or create a terminal with the given name
+    let terminal = vscode.window.terminals.find(t => t.name === terminalName);
+    if (!terminal) {
+      const cwd = (params.cwd as string) ? resolveWorkspacePath(params.cwd as string) : getFirstWorkspace();
+      terminal = vscode.window.createTerminal({
+        name: terminalName,
+        cwd: cwd,
+      });
+    }
+
+    terminal.show(true); // preserveFocus = true
+    terminal.sendText(command);
+
+    // Brief wait to let the command start
+    await new Promise(resolve => setTimeout(resolve, Math.min(waitMs, 5000)));
+
+    return {
+      terminal: terminalName,
+      command: command,
+      sent: true,
+      note: 'Command sent to terminal. Use get_terminal_output to read output, or run_command for programmatic execution with stdout capture.',
+    };
+  },
+
+  // Get the last output lines from the TRAE output channel / terminal
+  // Note: VS Code does not expose terminal stdout directly, so this reads
+  // from the extension's own output channel log or a temp file if set.
+  get_terminal_output: async (params: Record<string, unknown>) => {
+    const terminalName = (params.terminalName as string) || 'TRAE MCP';
+    const lines = (params.lines as number) || 50;
+
+    // VS Code doesn't expose terminal stdout natively.
+    // Strategy: check for a temp output file that run_terminal_command might produce,
+    // or give the user guidance to use run_command for captured output.
+    const tmpOutputFile = `/tmp/trae-mcp-terminal-output-${terminalName.replace(/[^a-z0-9]/gi, '_')}.txt`;
+
+    if (require('fs').existsSync(tmpOutputFile)) {
+      try {
+        const content = require('fs').readFileSync(tmpOutputFile, 'utf-8');
+        const lineArr = content.split('\n');
+        const recent = lineArr.slice(-lines).join('\n');
+        return {
+          terminal: terminalName,
+          output: recent,
+          lineCount: lineArr.length,
+          source: 'file',
+          filePath: tmpOutputFile,
+        };
+      } catch {
+        // fall through
+      }
+    }
+
+    // Fallback: list open terminals and their state
+    const terminals = vscode.window.terminals.map(t => ({
+      name: t.name,
+      processId: null as number | null, // processId requires async
+    }));
+
+    return {
+      terminal: terminalName,
+      output: null,
+      terminals: terminals,
+      note: 'VS Code does not expose terminal stdout directly. Use run_command tool for shell commands with captured output. Alternatively, redirect command output: run_terminal_command with "command": "mycommand 2>&1 | tee /tmp/out.txt", then read_file /tmp/out.txt.',
+      suggestion: `To capture output: use run_command with the same command. For interactive terminal use, run_terminal_command sends keystrokes.`,
+    };
+  },
+
+  // Invoke TRAE SOLO agent (via SOLO mode + chat send)
   invoke_solo_agent: async (params: Record<string, unknown>) => {
     const task = params.task as string;
     if (!task) throw new Error('Missing required parameter: task');
-    // Try to invoke via TRAE's internal command mechanism
     try {
-      const result = await vscode.commands.executeCommand('icube.solo.executeTask', { task });
-      return { success: true, result };
+      // Step 1: Ensure SOLO mode is active
+      await vscode.commands.executeCommand('trae.solo.mode.toggle');
     } catch {
-      // Fallback: return instruction for manual execution
-      return {
-        success: false,
-        instruction: `Manual task: ${task}`,
-        hint: 'TRAE SOLO agent must be invoked manually in IDE'
-      };
+      // Continue even if toggle fails (might already be in SOLO mode)
+    }
+    try {
+      // Step 2: Focus the chat input
+      await vscode.commands.executeCommand('icube.ai-chat.focusInput');
+    } catch {
+      // Fallback: just try to send the message
+    }
+    try {
+      // Step 3: Send the task as a message to the AI chat
+      // The sendMessage command takes a string or structured input
+      const result = await vscode.commands.executeCommand('icube.ai-chat.sendMessage', task);
+      return { success: true, result, mode: 'solo' };
+    } catch (e) {
+      // Try alternative: add to chat first
+      try {
+        await vscode.commands.executeCommand('icube.ai-chat.plainText.addToChat', task);
+        await vscode.commands.executeCommand('icube.ai-chat.sendMessage', '');
+        return { success: true, mode: 'solo_fallback', task };
+      } catch (e2) {
+        const msg = e2 instanceof Error ? e2.message : String(e2);
+        return {
+          success: false,
+          mode: 'solo',
+          instruction: task,
+          error: msg,
+          hint: 'SOLO agent could not be reached. Try opening SOLO mode manually in TRAE.'
+        };
+      }
     }
   },
 };
