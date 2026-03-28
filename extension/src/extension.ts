@@ -773,10 +773,16 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     }
 
     // Build environment with token replacement
+    // Prepend TRAE's node to PATH so npx uses the right node version
+    const traeNodePath = '/usr/share/trae/bin:'
+      + path.join(path.dirname(process.execPath), '..', '..', '..', '..', '..', 'usr', 'share', 'trae', 'bin');
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (v !== undefined) { env[k] = v; }
     }
+    // Ensure TRAE's node is first in PATH
+    env['PATH'] = '/usr/share/trae/bin:' + env['PATH'];
+    env['HOME'] = os.homedir(); // needed for npm cache
     // Note: Docker MCP servers may need DOCKER_CONTEXT set if using non-default context
     // For most cases, the default Docker context works without setting this explicitly
     if (serverConfig.env) {
