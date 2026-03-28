@@ -103,15 +103,26 @@ Since `aha_ipc` is ByteDance's internal FFI mechanism, we **cannot directly inje
 
 4. **MCP as the integration layer**: Our MCP server exposes file/workspace tools that TRAE's agent can use. The agent can call our MCP tools as external tools if MCP is configured.
 
-## `invoke_solo_agent` Tool Implementation
+## `invoke_solo_agent` Tool — Implementation
 
-The current implementation in `extension/src/extension.ts` attempts:
+**Updated approach** (2026-03-28):
 
 ```typescript
-const result = await vscode.commands.executeCommand('icube.solo.executeTask', { task });
+// Step 1: Toggle SOLO mode on
+await vscode.commands.executeCommand('trae.solo.mode.toggle');
+// Step 2: Focus chat input
+await vscode.commands.executeCommand('icube.ai-chat.focusInput');
+// Step 3: Send task to AI chat
+await vscode.commands.executeCommand('icube.ai-chat.sendMessage', task);
 ```
 
-If this fails (command not registered), it falls back to returning an instruction for manual action. This is the graceful degradation strategy.
+**Key commands discovered:**
+- `trae.solo.mode.toggle` — toggles SOLO mode on/off
+- `icube.ai-chat.sendMessage` — sends a message to the AI chat panel
+- `icube.ai-chat.focusInput` — focuses the chat input field
+- `icube.ai-chat.plainText.addToChat` — adds plain text to the chat
+
+The SOLO agent receives tasks via the AI chat interface, not via a direct command. The updated tool tries the sendMessage path first, then falls back to addToChat + sendMessage if that fails.
 
 ## Open Questions
 
