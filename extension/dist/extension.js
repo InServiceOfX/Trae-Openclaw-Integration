@@ -936,6 +936,89 @@ const TOOLS = {
         const task = params.task || 'Build the project';
         return await TOOLS['send_to_solo_chat']({ text: task });
     },
+    // ── Custom Agent Management ────────────────────────────────────────────────
+    create_agent: async (params) => {
+        // Create a custom agent in TRAE via icube.ai.agent.create
+        // Schema: { englishIdentifier, prompt, name, avatar?, mcpServers?, builtInTools?, isMemoryEnhanced? }
+        const name = params.name;
+        const englishIdentifier = params.englishIdentifier || name.toLowerCase().replace(/\s+/g, '-');
+        const prompt = params.prompt;
+        const avatar = params.avatar || '';
+        const mcpServers = params.mcpServers || [];
+        const builtInTools = params.builtInTools || ['Read', 'Edit', 'Terminal'];
+        const isMemoryEnhanced = params.isMemoryEnhanced || false;
+        if (!name || !prompt) {
+            throw new Error('Missing required parameters: name, prompt');
+        }
+        try {
+            // Try to create via VS Code command (if exposed)
+            const result = await vscode.commands.executeCommand('icube.ai.agent.create', {
+                englishIdentifier,
+                prompt,
+                name,
+                avatar,
+                mcpServers,
+                builtInTools,
+                isMemoryEnhanced,
+            });
+            return { success: true, action: 'agent_created_via_command', name, englishIdentifier, result };
+        }
+        catch {
+            // Fallback: try the other create command
+            try {
+                const result = await vscode.commands.executeCommand('icube.ai.developer.agentImportFromSchema', {
+                    name,
+                    prompt,
+                    identifier: englishIdentifier,
+                    tools: { mcpServers, builtInTools },
+                });
+                return { success: true, action: 'agent_imported', name, englishIdentifier, result };
+            }
+            catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                return {
+                    success: false,
+                    error: msg,
+                    hint: 'Could not create agent via commands. Try creating manually: @ → Create Agent → Smart Generation',
+                    schema: {
+                        englishIdentifier: 'string (e.g. "openclaw-helper")',
+                        prompt: 'string (agent instructions/persona)',
+                        name: 'string',
+                        mcpServers: 'string[] (e.g. ["github", "docker"])',
+                        builtInTools: 'string[] (e.g. ["Read", "Edit", "Terminal", "Preview", "WebSearch"])',
+                        isMemoryEnhanced: 'boolean',
+                    }
+                };
+            }
+        }
+    },
+    list_agents: async (params) => {
+        // List agents from the agent schema file
+        const agentDir = path.join(os.homedir(), '.config', 'Trae', 'User', 'globalStorage', 'ai-agents');
+        try {
+            const files = await fs.promises.readdir(agentDir);
+            const agents = [];
+            for (const file of files) {
+                if (file.endsWith('.json') && file !== 'agent.schema.v3.json') {
+                    try {
+                        const content = await fs.promises.readFile(path.join(agentDir, file), 'utf-8');
+                        const agent = JSON.parse(content);
+                        agents.push({
+                            name: agent.name,
+                            englishIdentifier: agent.englishIdentifier,
+                            prompt: (agent.prompt || '').substring(0, 100),
+                            tools: agent.tools || {},
+                        });
+                    }
+                    catch { /* skip invalid files */ }
+                }
+            }
+            return { agents, count: agents.length, path: agentDir };
+        }
+        catch (e) {
+            return { success: false, error: String(e), path: agentDir, hint: 'No agents created yet' };
+        }
+    },
 };
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function resolveWorkspacePath(relativePath) {
