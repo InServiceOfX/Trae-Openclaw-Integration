@@ -115,6 +115,14 @@ for attempt in range(5):
 | `list_mcp_servers` | List all TRAE MCP servers (User + Global) | — |
 | `add_mcp_server` | Add an MCP server to TRAE config | `name`, `command`, `args` |
 | `call_mcp_server` | Call any TRAE MCP server's tool directly | `server`, `tool`, `arguments` |
+| `github_search_repos` | Search GitHub repositories | `query`, `perPage` |
+| `github_list_issues` | List GitHub issues on a repo | `owner`, `repo`, `state` |
+| `github_create_issue` | Create a GitHub issue | `owner`, `repo`, `title`, `body` |
+| `github_get_repo` | Get GitHub repo info | `owner`, `repo` |
+| `docker_list_containers` | List Docker containers | `all` |
+| `docker_list_images` | List Docker images | — |
+| `docker_get_logs` | Get container logs | `container`, `tail` |
+| `solo_build` | Trigger SOLO Builder with a task | `task` |
 
 ---
 
