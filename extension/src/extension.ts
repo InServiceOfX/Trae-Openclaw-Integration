@@ -868,7 +868,7 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     const query = (params.query as string) || '';
     const perPage = (params.perPage as number) || 5;
     return new Promise((resolve) => {
-      const proc = spawn('gh', ['api', 'search/repositories', '-q', '.[] | {name:.name,full_name:.full_name,description:.description,stars:.stargazers_count,language:.language,url:.html_url}', '-F', `query=${query}`, '-L', String(perPage)], { env: { ...process.env, HOME: os.homedir() } });
+      const proc = spawn('/usr/local/bin/gh', ['api', 'search/repositories', '-q', '.[] | {name:.name,full_name:.full_name,description:.description,stars:.stargazers_count,language:.language,url:.html_url}', '-F', `query=${query}`, '-L', String(perPage)], { env: { ...process.env, HOME: os.homedir() } });
       let stdout = '', stderr = '';
       proc.stdout!.on('data', (c) => stdout += c.toString());
       proc.stderr!.on('data', (c) => stderr += c.toString());
@@ -890,7 +890,7 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     const repo = (params.repo as string) || 'Trae-Openclaw-Integration';
     const state = (params.state as string) || 'open';
     return new Promise((resolve) => {
-      const proc = spawn('gh', ['issue', 'list', '--repo', `${owner}/${repo}`, '--state', state, '--limit', String((params.perPage as number) || 10), '--json', 'number,title,state,url,labels'], { env: { ...process.env, HOME: os.homedir() } });
+      const proc = spawn('/usr/local/bin/gh', ['issue', 'list', '--repo', `${owner}/${repo}`, '--state', state, '--limit', String((params.perPage as number) || 10), '--json', 'number,title,state,url,labels'], { env: { ...process.env, HOME: os.homedir() } });
       let stdout = '', stderr = '';
       proc.stdout!.on('data', (c) => stdout += c.toString());
       proc.stderr!.on('data', (c) => stderr += c.toString());
@@ -908,7 +908,7 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     const owner = (params.owner as string) || 'InServiceOfX';
     const repo = (params.repo as string) || 'Trae-Openclaw-Integration';
     return new Promise((resolve) => {
-      const proc = spawn('gh', ['repo', 'view', `${owner}/${repo}`, '--json', 'name,description,url,stargazerCount,primaryLanguage,pushedAt,defaultBranchRef'], { env: { ...process.env, HOME: os.homedir() } });
+      const proc = spawn('/usr/local/bin/gh', ['repo', 'view', `${owner}/${repo}`, '--json', 'name,description,url,stargazerCount,primaryLanguage,pushedAt,defaultBranchRef'], { env: { ...process.env, HOME: os.homedir() } });
       let stdout = '', stderr = '';
       proc.stdout!.on('data', (c) => stdout += c.toString());
       proc.stderr!.on('data', (c) => stderr += c.toString());
@@ -929,7 +929,7 @@ const TOOLS: Record<string, (params: Record<string, unknown>) => Promise<unknown
     const body = (params.body as string) || '';
     if (!title) throw new Error('Missing required parameter: title');
     return new Promise((resolve) => {
-      const proc = spawn('gh', ['issue', 'create', '--repo', `${owner}/${repo}`, '--title', title, '--body', body], { env: { ...process.env, HOME: os.homedir() } });
+      const proc = spawn('/usr/local/bin/gh', ['issue', 'create', '--repo', `${owner}/${repo}`, '--title', title, '--body', body], { env: { ...process.env, HOME: os.homedir() } });
       let stdout = '', stderr = '';
       proc.stdout!.on('data', (c) => stdout += c.toString());
       proc.stderr!.on('data', (c) => stderr += c.toString());
