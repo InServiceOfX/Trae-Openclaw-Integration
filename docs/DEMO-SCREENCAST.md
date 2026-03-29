@@ -169,6 +169,17 @@ This project demonstrates a deep integration between OpenClaw and the TRAE IDE. 
 
 OpenClaw connects to this extension over a local Unix socket, routing commands through TRAE's MCP infrastructure to external services and IDE controls.
 
-**Built with:** TRAE AI, MiniMax API
+**What we learned:**
+
+TRAE is a VS Code fork built on Electron — the main binary at `/usr/share/trae/trae` is an ELF (Executable and Linkable Format, the standard binary format for Linux executables) that launches the Electron process powering the IDE.
+
+Under the hood, TRAE's AI infrastructure is called **iCube** (internal ByteDance framework). All AI-related VS Code commands exposed by TRAE live in the `icube.*` namespace — e.g., `icube.ai-chat.sendMessage`, `icube.common.commands.tooling.browserUseTool`.
+
+**SOLO mode** is powered by a separate Rust-based AI agent binary (`ai_agent`). This is evidenced by:
+- `@byted-icube/trae-network-client` — a ZeroMQ client for the "Trae Network Service" with NAPI-RS (Rust → Node.js) native bindings (`trae-network-node.linux-x64-gnu.node`)
+- AHA-IPC (ByteDance's proprietary FFI-based IPC) running `jsonrpsee` (Rust JSON-RPC library) inside Electron's NativeExtensionService
+- The SOLO agent cloud-connecting to `core-normal.traeapi.us` on startup for dynamic config and model selection
+
+**Built with:** TRAE, MiniMax API
 
 **GitHub:** https://github.com/InServiceOfX/Trae-Openclaw-Integration
